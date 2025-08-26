@@ -16,14 +16,19 @@ type StringOrBuffer = string | TypedArray | ArrayBuffer | DataView
  * @param password - The password to derive the key from.
  * @returns A promise that resolves to the derived CryptoKey.
  */
-export function keyFromPassword(password: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    'raw',
-    toUint8Array(password),
-    { name: 'PBKDF2' },
-    false,
-    ['deriveKey'],
-  )
+export async function keyFromPassword(password: string): Promise<CryptoKey> {
+  const pw = toUint8Array(password)
+  try {
+    return await crypto.subtle.importKey(
+      'raw',
+      pw,
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey'],
+    )
+  } finally {
+    pw.fill(0)
+  }
 }
 
 /**
