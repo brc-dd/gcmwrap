@@ -54,3 +54,13 @@ Deno.test('tampering with sealed data returns undefined', async () => {
 
   assertEquals(unsealed, undefined)
 })
+
+Deno.test('overriding iterations works', async () => {
+  const manager = await CryptoManager.fromPassword('my-secret-password', { iterations: 5000 })
+
+  const sealed1 = await manager.seal(data)
+  const sealed2 = await manager.seal(data, { iterations: 10000 })
+
+  assertEquals(JSON.parse(sealed1).it, 5000)
+  assertEquals(JSON.parse(sealed2).it, 10000)
+})
