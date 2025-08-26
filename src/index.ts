@@ -1,4 +1,9 @@
-import { stringToUint8Array, toUint8Array, uint8ArrayToBase64 } from 'npm:uint8array-extras@1.5.0'
+import {
+  stringToUint8Array,
+  toUint8Array,
+  uint8ArrayToBase64,
+  uint8ArrayToString,
+} from 'npm:uint8array-extras@1.5.0'
 
 export class CryptoManager {
   #baseKey!: CryptoKey
@@ -86,8 +91,8 @@ export class CryptoManager {
     }
 
     const salt = stringToUint8Array(s)
-    const dekKek = await crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt, iterations: it, hash: 'SHA-256' },
+    const kek = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations: it >>> 0, hash: 'SHA-256' },
       this.#baseKey,
       { name: 'AES-KW', length: 256 },
       false,
@@ -98,11 +103,11 @@ export class CryptoManager {
     const dek = await crypto.subtle.unwrapKey(
       'raw',
       wrappedDek,
-      dekKek,
+      kek,
       { name: 'AES-KW' },
       { name: 'AES-GCM', length: 256 },
-      true,
-      ['encrypt', 'decrypt'],
+      false,
+      ['decrypt'],
     )
 
     const ciphertext = stringToUint8Array(ct)
@@ -112,11 +117,7 @@ export class CryptoManager {
       ciphertext,
     )
 
-    const bytes = new Uint8Array(plaintext)
-    const str = new TextDecoder().decode(bytes)
-    bytes.fill(0)
-
-    return JSON.parse(str)
+    return JSON.parse(uint8ArrayToString(plaintext))
   }
 
   #ensureReady() {
