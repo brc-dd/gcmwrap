@@ -60,7 +60,7 @@ export async function seal(
     key,
     { name: 'AES-KW', length: 256 },
     false,
-    ['wrapKey', 'unwrapKey'],
+    ['wrapKey'],
   )
 
   const wrappedDek = await crypto.subtle.wrapKey(
@@ -95,18 +95,18 @@ export async function unseal(
     if (
       v !== 1 ||
       typeof ct !== 'string' ||
-      typeof it !== 'number' || !(it > 0) ||
+      it !== (it | 0) || it < 1 || it > 2_147_483_647 ||
       typeof iv !== 'string' ||
       typeof s !== 'string' ||
       typeof w !== 'string'
     ) throw new Error('Invalid payload format')
 
     const kek = await crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: toUint8Array(s, 'base64'), iterations: it >>> 0, hash: 'SHA-256' },
+      { name: 'PBKDF2', salt: toUint8Array(s, 'base64'), iterations: it, hash: 'SHA-256' },
       key,
       { name: 'AES-KW', length: 256 },
       false,
-      ['wrapKey', 'unwrapKey'],
+      ['unwrapKey'],
     )
 
     const dek = await crypto.subtle.unwrapKey(
