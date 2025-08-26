@@ -202,13 +202,13 @@ function validateV1(
 }
 
 /** @internal */
-function toUint8Array(input: StringOrBuffer, fromEncoding?: 'base64'): Uint8Array {
+export function toUint8Array(input: StringOrBuffer, fromEncoding?: 'base64'): Uint8Array {
   if (typeof input !== 'string') return _toUint8Array(input)
   if (fromEncoding === 'base64') return _base64ToUint8Array(input)
   return _stringToUint8Array(input)
 }
 
 /** @internal */
-function toBase64(input: StringOrBuffer): string {
-  return _uint8ArrayToBase64(toUint8Array(input))
+export function toBase64(input: StringOrBuffer): string {
+  return _uint8ArrayToBase64(toUint8Array(input), { urlSafe: true })
 }

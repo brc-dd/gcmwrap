@@ -1,7 +1,6 @@
 import { assertEquals } from 'jsr:@std/assert'
 import { decode, encode } from 'npm:cborg@~4.2.14'
-import { base64ToUint8Array, uint8ArrayToBase64 } from 'npm:uint8array-extras@^1.5.0'
-import { CryptoManager } from '../src/index.ts'
+import { CryptoManager, toBase64, toUint8Array } from '../src/index.ts'
 
 const data = { foo: 'bar', num: 42, nested: { a: 1, b: [1, 2, 3] } }
 const aad = { info: 'additional-authenticated-data' }
@@ -51,7 +50,7 @@ Deno.test('tampering with sealed data returns undefined', async () => {
   const manager = await CryptoManager.fromPassword('my-secret-password')
 
   const sealed = await manager.seal(data)
-  const tampered = uint8ArrayToBase64(encode({ ...decode(base64ToUint8Array(sealed)), it: 1000 }))
+  const tampered = toBase64(encode({ ...decode(toUint8Array(sealed, 'base64')), it: 1000 }))
   const unsealed = await manager.unseal(tampered)
 
   assertEquals(unsealed, undefined)
@@ -63,6 +62,6 @@ Deno.test('overriding iterations works', async () => {
   const sealed1 = await manager.seal(data)
   const sealed2 = await manager.seal(data, { iterations: 10000 })
 
-  assertEquals(decode(base64ToUint8Array(sealed1)).it, 5000)
-  assertEquals(decode(base64ToUint8Array(sealed2)).it, 10000)
+  assertEquals(decode(toUint8Array(sealed1, 'base64')).it, 5000)
+  assertEquals(decode(toUint8Array(sealed2, 'base64')).it, 10000)
 })
