@@ -1,10 +1,10 @@
+import { decode, encode } from 'npm:cborg@^4.2.14'
 import {
   base64ToUint8Array as _base64ToUint8Array,
   stringToUint8Array as _stringToUint8Array,
   toUint8Array as _toUint8Array,
   type TypedArray,
   uint8ArrayToBase64 as _uint8ArrayToBase64,
-  uint8ArrayToString,
 } from 'npm:uint8array-extras@^1.5.0'
 
 export type StringOrBuffer = string | TypedArray | ArrayBuffer | DataView
@@ -48,11 +48,11 @@ export async function seal(
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const meta = { v: 1, it, s: toBase64(salt) }
 
-  const aad = toUint8Array(JSON.stringify({ ...options?.aad, ...meta }))
+  const aad = encode({ ...options?.aad, ...meta })
   const ct = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv, additionalData: aad, tagLength: 128 },
     dek,
-    toUint8Array(JSON.stringify(data)),
+    encode(data),
   )
 
   const kek = await crypto.subtle.deriveKey(
@@ -95,7 +95,7 @@ export async function unseal(
     if (
       v !== 1 ||
       typeof ct !== 'string' ||
-      it !== (it | 0) || it < 1 || it > 2_147_483_647 ||
+      typeof it !== 'number' || it < 1 || it > 2_000_000 ||
       typeof iv !== 'string' ||
       typeof s !== 'string' ||
       typeof w !== 'string'
@@ -119,14 +119,14 @@ export async function unseal(
       ['decrypt'],
     )
 
-    const aad = toUint8Array(JSON.stringify({ ...options?.aad, v, it, s }))
+    const aad = encode({ ...options?.aad, v, it, s })
     const pt = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: toUint8Array(iv, 'base64'), additionalData: aad, tagLength: 128 },
       dek,
       toUint8Array(ct, 'base64'),
     )
 
-    return JSON.parse(uint8ArrayToString(pt))
+    return decode(toUint8Array(pt))
   } catch {
     // FIXME: side-channel attacks are still possible, maybe add jitter?
     return undefined
