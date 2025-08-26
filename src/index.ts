@@ -10,6 +10,7 @@ import {
 
 export type SealOptions = { iterations?: number; aad?: Record<string, unknown> }
 type StringOrBuffer = string | TypedArray | ArrayBuffer | DataView
+type V1 = { v: 1; it: number; s: Uint8Array; iv: Uint8Array; ct: Uint8Array; w: Uint8Array }
 
 /**
  * Derive a CryptoKey from the password for deriving KEKs.
@@ -179,9 +180,7 @@ export class CryptoManager {
 }
 
 /** @internal */
-function validateV1(
-  data: unknown,
-): data is { v: 1; it: number; s: Uint8Array; iv: Uint8Array; ct: Uint8Array; w: Uint8Array } {
+function validateV1(data: unknown): data is V1 {
   if (!data || typeof data !== 'object') return false
   // deno-lint-ignore no-explicit-any
   const d = data as any
