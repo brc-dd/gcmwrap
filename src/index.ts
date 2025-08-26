@@ -1,4 +1,4 @@
-import { decode, encode } from 'npm:cborg@^4.2.14'
+import { decode, encode } from 'npm:cborg@~4.2.14'
 import {
   base64ToUint8Array as _base64ToUint8Array,
   isUint8Array,
@@ -189,16 +189,16 @@ export class CryptoManager {
 function validateV1(
   data: unknown,
 ): data is { v: 1; it: number; s: Uint8Array; iv: Uint8Array; ct: Uint8Array; w: Uint8Array } {
-  return (
-    !!data && typeof data === 'object' &&
-    'v' in data && data.v === 1 &&
-    'it' in data && typeof data.it === 'number' &&
-    Number.isSafeInteger(data.it) && data.it >= 1 && data.it <= 2_000_000 &&
-    's' in data && isUint8Array(data.s) &&
-    'iv' in data && isUint8Array(data.iv) &&
-    'ct' in data && isUint8Array(data.ct) &&
-    'w' in data && isUint8Array(data.w)
-  )
+  if (!data || typeof data !== 'object') return false
+  // deno-lint-ignore no-explicit-any
+  const d = data as any
+  if (d.v !== 1) return false
+  if (!Number.isSafeInteger(d.it) || d.it < 1 || d.it > 2_000_000) return false
+  if (!isUint8Array(d.s) || d.s.byteLength !== 16) return false
+  if (!isUint8Array(d.iv) || d.iv.byteLength !== 12) return false
+  if (!isUint8Array(d.w) || d.w.byteLength !== 40) return false
+  if (!isUint8Array(d.ct) || d.ct.byteLength < 16) return false
+  return true
 }
 
 /** @internal */

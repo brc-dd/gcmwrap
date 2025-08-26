@@ -1,5 +1,5 @@
 import { assertEquals } from 'jsr:@std/assert'
-import { decode, encode } from 'npm:cborg@^4.2.14'
+import { decode, encode } from 'npm:cborg@~4.2.14'
 import { base64ToUint8Array, uint8ArrayToBase64 } from 'npm:uint8array-extras@^1.5.0'
 import { CryptoManager } from '../src/index.ts'
 
@@ -25,7 +25,7 @@ Deno.test('unseal with wrong password returns undefined', async () => {
   assertEquals(unsealed, undefined)
 })
 
-Deno.test('multiple instances with same password can unseal data', async () => {
+Deno.test('different instances with same password can unseal data', async () => {
   const manager1 = await CryptoManager.fromPassword('instance1')
   const manager2 = await CryptoManager.fromPassword('instance1')
 
