@@ -1,6 +1,7 @@
 import { decode, encode } from 'npm:cborg@^4.2.14'
 import {
   base64ToUint8Array as _base64ToUint8Array,
+  isUint8Array,
   stringToUint8Array as _stringToUint8Array,
   toUint8Array as _toUint8Array,
   type TypedArray,
@@ -11,7 +12,7 @@ export type StringOrBuffer = string | TypedArray | ArrayBuffer | DataView
 export type SealOptions = { iterations?: number; aad?: Record<string, unknown> }
 
 /**
- * Derive a CryptoKey from a password using PBKDF2.
+ * Derive a CryptoKey from the password for deriving KEKs.
  * @param password - The password to derive the key from.
  * @returns A promise that resolves to the derived CryptoKey.
  */
@@ -26,11 +27,11 @@ export function keyFromPassword(password: StringOrBuffer): Promise<CryptoKey> {
 }
 
 /**
- * Seal (encrypt and wrap) data using a CryptoKey derived from a password.
- * @param key - A CryptoKey derived from a password using PBKDF2.
+ * Seal (encrypt and wrap) data.
+ * @param key - A CryptoKey to derive the KEK for wrapping the DEK.
  * @param data - The data to seal (encrypt and wrap).
  * @param options - Options for sealing, including the number of PBKDF2 iterations (default: 600,000) and additional authenticated data (AAD).
- * @returns A promise that resolves to the sealed data as a JSON string.
+ * @returns A promise that resolves to the sealed data.
  */
 export async function seal(
   key: CryptoKey,
@@ -46,7 +47,7 @@ export async function seal(
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const it = options?.iterations ?? 600_000
   const salt = crypto.getRandomValues(new Uint8Array(16))
-  const meta = { v: 1, it, s: toBase64(salt) }
+  const meta = { v: 1, it, s: salt }
 
   const aad = encode({ ...options?.aad, ...meta })
   const ct = await crypto.subtle.encrypt(
@@ -70,18 +71,13 @@ export async function seal(
     { name: 'AES-KW' },
   )
 
-  return JSON.stringify({
-    ...meta,
-    iv: toBase64(iv),
-    ct: toBase64(ct),
-    w: toBase64(wrappedDek),
-  })
+  return toBase64(encode({ ...meta, iv, ct, w: wrappedDek }))
 }
 
 /**
- * Unseal (decrypt and unwrap) data using a CryptoKey derived from a password.
- * @param key - A CryptoKey derived from a password using PBKDF2.
- * @param data - The sealed data as a JSON string.
+ * Unseal (decrypt and unwrap) data.
+ * @param key - A CryptoKey to derive the KEK for unwrapping the DEK.
+ * @param data - The sealed data.
  * @param options - Options for unsealing, including additional authenticated data (AAD).
  * @returns A promise that resolves to the unsealed (decrypted and unwrapped) data, or undefined if unsealing fails.
  */
@@ -91,18 +87,12 @@ export async function unseal(
   options?: SealOptions,
 ): Promise<unknown> {
   try {
-    const { v, ct, it, iv, s, w } = JSON.parse(data)
-    if (
-      v !== 1 ||
-      typeof ct !== 'string' ||
-      typeof it !== 'number' || it < 1 || it > 2_000_000 ||
-      typeof iv !== 'string' ||
-      typeof s !== 'string' ||
-      typeof w !== 'string'
-    ) throw new Error('Invalid payload format')
+    const parsed = decode(toUint8Array(data, 'base64'))
+    if (!validateV1(parsed)) throw new Error('Invalid payload format')
+    const { v, it, s, iv, ct, w } = parsed
 
     const kek = await crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: toUint8Array(s, 'base64'), iterations: it, hash: 'SHA-256' },
+      { name: 'PBKDF2', salt: s, iterations: it, hash: 'SHA-256' },
       key,
       { name: 'AES-KW', length: 256 },
       false,
@@ -111,7 +101,7 @@ export async function unseal(
 
     const dek = await crypto.subtle.unwrapKey(
       'raw',
-      toUint8Array(w, 'base64'),
+      w,
       kek,
       { name: 'AES-KW' },
       { name: 'AES-GCM', length: 256 },
@@ -121,9 +111,9 @@ export async function unseal(
 
     const aad = encode({ ...options?.aad, v, it, s })
     const pt = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: toUint8Array(iv, 'base64'), additionalData: aad, tagLength: 128 },
+      { name: 'AES-GCM', iv, additionalData: aad, tagLength: 128 },
       dek,
-      toUint8Array(ct, 'base64'),
+      ct,
     )
 
     return decode(toUint8Array(pt))
@@ -172,7 +162,7 @@ export class CryptoManager {
    * Seal (encrypt and wrap) data using the CryptoManager's base key.
    * @param data - The data to seal (encrypt and wrap).
    * @param options - Options for sealing, including the number of PBKDF2 iterations (default: 600,000) and additional authenticated data (AAD).
-   * @returns A promise that resolves to the sealed data as a JSON string.
+   * @returns A promise that resolves to the sealed data.
    */
   seal(
     data: unknown,
@@ -183,7 +173,7 @@ export class CryptoManager {
 
   /**
    * Unseal (decrypt and unwrap) data using the CryptoManager's base key.
-   * @param data - The sealed data as a JSON string.
+   * @param data - The sealed data.
    * @param options - Options for unsealing, including additional authenticated data (AAD).
    * @returns A promise that resolves to the unsealed (decrypted and unwrapped) data, or undefined if unsealing fails.
    */
@@ -193,6 +183,22 @@ export class CryptoManager {
   ): Promise<unknown> {
     return unseal(this.#baseKey, data, { ...this.#options, ...options })
   }
+}
+
+/** @internal */
+function validateV1(
+  data: unknown,
+): data is { v: 1; it: number; s: Uint8Array; iv: Uint8Array; ct: Uint8Array; w: Uint8Array } {
+  return (
+    !!data && typeof data === 'object' &&
+    'v' in data && data.v === 1 &&
+    'it' in data && typeof data.it === 'number' &&
+    Number.isSafeInteger(data.it) && data.it >= 1 && data.it <= 2_000_000 &&
+    's' in data && isUint8Array(data.s) &&
+    'iv' in data && isUint8Array(data.iv) &&
+    'ct' in data && isUint8Array(data.ct) &&
+    'w' in data && isUint8Array(data.w)
+  )
 }
 
 /** @internal */
