@@ -1,0 +1,11 @@
+{
+  "name": "gcmwrap",
+  "version": "0.1.0",
+  "exports": "./src/index.ts",
+  "fmt": {
+    "lineWidth": 100,
+    "proseWrap": "preserve",
+    "semiColons": false,
+    "singleQuote": true
+  }
+}
