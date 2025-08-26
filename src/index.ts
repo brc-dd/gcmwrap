@@ -8,15 +8,15 @@ import {
   uint8ArrayToBase64 as _uint8ArrayToBase64,
 } from 'npm:uint8array-extras@^1.5.0'
 
-export type StringOrBuffer = string | TypedArray | ArrayBuffer | DataView
 export type SealOptions = { iterations?: number; aad?: Record<string, unknown> }
+type StringOrBuffer = string | TypedArray | ArrayBuffer | DataView
 
 /**
  * Derive a CryptoKey from the password for deriving KEKs.
  * @param password - The password to derive the key from.
  * @returns A promise that resolves to the derived CryptoKey.
  */
-export function keyFromPassword(password: StringOrBuffer): Promise<CryptoKey> {
+export function keyFromPassword(password: string): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
     toUint8Array(password),
@@ -138,10 +138,7 @@ export class CryptoManager {
   #baseKey: CryptoKey
   #options?: SealOptions
 
-  constructor(
-    baseKey: CryptoKey,
-    options?: SealOptions,
-  ) {
+  constructor(baseKey: CryptoKey, options?: SealOptions) {
     this.#baseKey = baseKey
     this.#options = options
   }
@@ -151,10 +148,7 @@ export class CryptoManager {
    * @param password - The password to derive the key from.
    * @returns A promise that resolves to a CryptoManager instance.
    */
-  static async fromPassword(
-    password: StringOrBuffer,
-    options?: SealOptions,
-  ): Promise<CryptoManager> {
+  static async fromPassword(password: string, options?: SealOptions): Promise<CryptoManager> {
     return new CryptoManager(await keyFromPassword(password), options)
   }
 
@@ -164,10 +158,7 @@ export class CryptoManager {
    * @param options - Options for sealing, including the number of PBKDF2 iterations (default: 600,000) and additional authenticated data (AAD).
    * @returns A promise that resolves to the sealed data.
    */
-  seal(
-    data: unknown,
-    options?: SealOptions,
-  ): Promise<string> {
+  seal(data: unknown, options?: SealOptions): Promise<string> {
     return seal(this.#baseKey, data, { ...this.#options, ...options })
   }
 
@@ -177,10 +168,7 @@ export class CryptoManager {
    * @param options - Options for unsealing, including additional authenticated data (AAD).
    * @returns A promise that resolves to the unsealed (decrypted and unwrapped) data, or undefined if unsealing fails.
    */
-  unseal(
-    data: string,
-    options?: SealOptions,
-  ): Promise<unknown> {
+  unseal(data: string, options?: SealOptions): Promise<unknown> {
     return unseal(this.#baseKey, data, { ...this.#options, ...options })
   }
 }
