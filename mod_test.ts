@@ -143,7 +143,7 @@ Deno.test('CryptoManager', async (t) => {
     await t.step('by altering the wrapped key', () => tamperAndTest('w', (w) => w[0] ^= 0x01))
   })
 
-  await t.step('should fail gracefully for malformed or garbage input', async () => {
+  await t.step('should fail gracefully for malformed or garbage input', async (t) => {
     const manager = await CryptoManager.fromPassword(password)
 
     const mockSealed =
@@ -152,18 +152,36 @@ Deno.test('CryptoManager', async (t) => {
     const createMockPayload = (overrides = {}) =>
       toBase64(encode({ ...mockSealedDecoded, ...overrides }))
 
-    assertEquals(await manager.unseal('not-valid-base64-or-cbor'), undefined)
-    assertEquals(await manager.unseal(toBase64(new Uint8Array([1, 2, 3]))), undefined)
-    assertEquals(await manager.unseal(toBase64(encode({ v: 1, wrong: 'field' }))), undefined)
-
-    assertEquals(await manager.unseal(createMockPayload()), data)
-    assertEquals(await manager.unseal(createMockPayload({ v: 2 })), undefined)
-    assertEquals(await manager.unseal(createMockPayload({ it: 0 })), undefined)
-    assertEquals(await manager.unseal(createMockPayload({ it: 2_000_001 })), undefined)
-    assertEquals(await manager.unseal(createMockPayload({ s: new Uint8Array(15) })), undefined)
-    assertEquals(await manager.unseal(createMockPayload({ iv: new Uint8Array(11) })), undefined)
-    assertEquals(await manager.unseal(createMockPayload({ w: new Uint8Array(39) })), undefined)
-    assertEquals(await manager.unseal(createMockPayload({ ct: new Uint8Array(15) })), undefined)
+    await t.step('with non-base64 input', async () => {
+      assertEquals(await manager.unseal('not-valid-base64-or-cbor'), undefined)
+    })
+    await t.step('with non-CBOR input', async () => {
+      assertEquals(await manager.unseal(toBase64(new Uint8Array([1, 2, 3]))), undefined)
+    })
+    await t.step('with missing required fields', async () => {
+      assertEquals(await manager.unseal(toBase64(encode({ v: 1, wrong: 'field' }))), undefined)
+    })
+    await t.step('with unsupported version', async () => {
+      assertEquals(await manager.unseal(createMockPayload({ v: 2 })), undefined)
+    })
+    await t.step('with out-of-bounds iterations (0)', async () => {
+      assertEquals(await manager.unseal(createMockPayload({ it: 0 })), undefined)
+    })
+    await t.step('with out-of-bounds iterations (2,000,001)', async () => {
+      assertEquals(await manager.unseal(createMockPayload({ it: 2_000_001 })), undefined)
+    })
+    await t.step('with invalid salt length', async () => {
+      assertEquals(await manager.unseal(createMockPayload({ s: new Uint8Array(15) })), undefined)
+    })
+    await t.step('with invalid IV length', async () => {
+      assertEquals(await manager.unseal(createMockPayload({ iv: new Uint8Array(11) })), undefined)
+    })
+    await t.step('with invalid wrapped key length', async () => {
+      assertEquals(await manager.unseal(createMockPayload({ w: new Uint8Array(39) })), undefined)
+    })
+    await t.step('with invalid ciphertext length', async () => {
+      assertEquals(await manager.unseal(createMockPayload({ ct: new Uint8Array(15) })), undefined)
+    })
   })
 })
 
