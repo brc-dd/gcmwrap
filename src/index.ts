@@ -17,7 +17,7 @@ type V1 = { v: 1; it: number; s: Uint8Array; iv: Uint8Array; ct: Uint8Array; w: 
  * @param password - The password to derive the key from.
  * @returns A promise that resolves to the derived CryptoKey.
  */
-export async function keyFromPassword(password: string): Promise<CryptoKey> {
+export async function generateKey(password: string): Promise<CryptoKey> {
   const pw = toUint8Array(password)
   try {
     return await crypto.subtle.importKey(
@@ -51,7 +51,7 @@ export async function seal(
   )
 
   const iv = crypto.getRandomValues(new Uint8Array(12))
-  const it = options?.iterations ?? 600_000
+  const it = Math.min(Math.max(options?.iterations ?? 600_000, 1), 2_000_000)
   const salt = crypto.getRandomValues(new Uint8Array(16))
   const meta = { v: 1, it, s: salt }
 
@@ -155,7 +155,7 @@ export class CryptoManager {
    * @returns A promise that resolves to a CryptoManager instance.
    */
   static async fromPassword(password: string, options?: SealOptions): Promise<CryptoManager> {
-    return new CryptoManager(await keyFromPassword(password), options)
+    return new CryptoManager(await generateKey(password), options)
   }
 
   /**
