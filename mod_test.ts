@@ -137,10 +137,10 @@ Deno.test('CryptoManager', async (t) => {
       assertEquals(unsealed, undefined)
     }
 
-    await t.step('by altering the ciphertext', () => tamperAndTest('ct', (ct) => ct[0] ^= 0x01))
-    await t.step('by altering the IV', () => tamperAndTest('iv', (iv) => iv[0] ^= 0x01))
-    await t.step('by altering the salt', () => tamperAndTest('s', (s) => s[0] ^= 0x01))
-    await t.step('by altering the wrapped key', () => tamperAndTest('w', (w) => w[0] ^= 0x01))
+    await t.step('by altering the ciphertext', () => tamperAndTest('ct', (ct) => ct[0]! ^= 0x01))
+    await t.step('by altering the IV', () => tamperAndTest('iv', (iv) => iv[0]! ^= 0x01))
+    await t.step('by altering the salt', () => tamperAndTest('s', (s) => s[0]! ^= 0x01))
+    await t.step('by altering the wrapped key', () => tamperAndTest('w', (w) => w[0]! ^= 0x01))
   })
 
   await t.step('should fail gracefully for malformed or garbage input', async (t) => {

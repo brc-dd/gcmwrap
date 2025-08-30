@@ -7,5 +7,10 @@
     "proseWrap": "preserve",
     "semiColons": false,
     "singleQuote": true
+  },
+  "compilerOptions": {
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true
   }
 }
