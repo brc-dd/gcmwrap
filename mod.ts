@@ -18,21 +18,52 @@ const fakeDekPromise = crypto.subtle.importKey(
   ['decrypt'],
 )
 
+/**
+ * Options for customizing the sealing and unsealing process.
+ */
 export interface SealOptions {
+  /**
+   * Additional Associated Data (AAD) to be authenticated but not encrypted.
+   * This can be used to bind the ciphertext to a specific context.
+   */
   aad?: Record<string, unknown>
+  /**
+   * The number of iterations to use for the PBKDF2 key derivation function.
+   * A higher number increases security but also increases the time it takes to seal/unseal.
+   * @default 600_000
+   */
   iterations?: number
+  /**
+   * A function to encode the input data into a Uint8Array before encryption.
+   * @default // A function that handles JSON-serializable data.
+   */
   encode?: (data: unknown) => Uint8Array
+  /**
+   * A function to decode a Uint8Array back into the original data format after decryption.
+   * @default // A function that parses a UTF-8 string as JSON.
+   */
   decode?: (data: Uint8Array) => unknown
 }
 
+/**
+ * Represents the structure of the version 1 sealed data payload.
+ */
 export interface SealedV1 {
+  /** The version identifier (always 1 for this version). */
   v: 1
+  /** The 16-byte salt used for PBKDF2 key derivation. */
   s: Uint8Array
+  /** The 12-byte initialization vector (IV) used for AES-GCM encryption. */
   iv: Uint8Array
+  /** The 40-byte wrapped (encrypted) Data Encryption Key (DEK). */
   w: Uint8Array
+  /** The ciphertext (encrypted data). */
   ct: Uint8Array
 }
 
+/**
+ * Default options for the seal and unseal operations.
+ */
 export const defaults: Readonly<Required<Omit<SealOptions, 'aad'>>> = Object.freeze({
   iterations: 600_000,
   encode(data) {
@@ -44,6 +75,13 @@ export const defaults: Readonly<Required<Omit<SealOptions, 'aad'>>> = Object.fre
   },
 })
 
+/**
+ * Generates a `CryptoKey` from a password string for use in key derivation.
+ * The key is suitable for use with PBKDF2.
+ *
+ * @param password The password to derive the key from.
+ * @returns A promise that resolves to a `CryptoKey`.
+ */
 export async function generateKey(password: string): Promise<CryptoKey> {
   const pw = enc.encode(password)
   try {
@@ -59,6 +97,16 @@ export async function generateKey(password: string): Promise<CryptoKey> {
   }
 }
 
+/**
+ * Encrypts and authenticates data using a password-derived key.
+ * This process uses a Key-Wrapping mechanism (AES-KW) with a Data Encryption Key (DEK)
+ * and AES-GCM for the actual encryption.
+ *
+ * @param key The master `CryptoKey` derived from a password, used as a Key Encryption Key (KEK).
+ * @param data The data to be encrypted. Must be serializable by the `encode` function.
+ * @param options Optional settings to customize the sealing process.
+ * @returns A promise that resolves to a base64url-encoded string representing the sealed data.
+ */
 export async function seal(
   key: CryptoKey,
   data: unknown,
@@ -103,6 +151,17 @@ export async function seal(
     `${toBase64(new Uint8Array(w))}.${toBase64(new Uint8Array(ct))}`
 }
 
+/**
+ * Decrypts and authenticates data that was sealed with the `seal` function.
+ * It performs the operations in reverse, unwrapping the DEK and then decrypting the ciphertext.
+ * This function is time-safe; it takes a similar amount of time to execute whether
+ * the decryption is successful or not, which helps prevent timing attacks.
+ *
+ * @param key The master `CryptoKey` that was used to seal the data.
+ * @param sealed The base64url-encoded string from the `seal` function.
+ * @param options Optional settings to customize the unsealing process. Must match the options used for sealing.
+ * @returns A promise that resolves with the decrypted data, or `undefined` if decryption or authentication fails for any reason.
+ */
 export async function unseal(
   key: CryptoKey,
   sealed: string,
@@ -162,23 +221,53 @@ export async function unseal(
   }
 }
 
+/**
+ * A manager class that encapsulates a base key and provides convenience methods
+ * for sealing and unsealing data.
+ */
 export class CryptoManager {
   #baseKey: CryptoKey
   #options?: SealOptions
 
+  /**
+   * Creates a new CryptoManager instance with a pre-existing CryptoKey.
+   * @param baseKey The master `CryptoKey` to be used for all operations.
+   * @param options Default `SealOptions` to apply to all seal/unseal operations.
+   */
   constructor(baseKey: CryptoKey, options?: SealOptions) {
     this.#baseKey = baseKey
     this.#options = options
   }
 
+  /**
+   * Creates a new `CryptoManager` instance by deriving a key from a password.
+   *
+   * @param password The password to generate the key from.
+   * @param options Default `SealOptions` to apply to all seal/unseal operations.
+   * @returns A promise that resolves to a new `CryptoManager` instance.
+   */
   static async fromPassword(password: string, options?: SealOptions): Promise<CryptoManager> {
     return new CryptoManager(await generateKey(password), options)
   }
 
+  /**
+   * Seals data using the manager's internal base key and default options.
+   *
+   * @param data The data to seal.
+   * @param options Options to override the manager's default seal options for this operation.
+   * @returns A promise that resolves to the sealed data string.
+   */
   seal(data: unknown, options?: SealOptions): Promise<string> {
     return seal(this.#baseKey, data, { ...this.#options, ...options })
   }
 
+  /**
+   * Unseals data using the manager's internal base key and default options.
+   *
+   * @param data The sealed data string to unseal.
+   * @param options Options to override the manager's default unseal options for this operation.
+   * @returns A promise that resolves with the decrypted data, or `undefined` on failure.
+   */
   unseal(data: string, options?: SealOptions): Promise<unknown> {
     return unseal(this.#baseKey, data, { ...this.#options, ...options })
   }
