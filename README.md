@@ -8,14 +8,14 @@ A lightweight and secure JavaScript encryption library offering authenticated en
   - **Strong Cryptography**: Employs AES-256-GCM for encryption, PBKDF2-SHA256 for password-based key derivation, and AES-KW for key wrapping.
   - **Authenticated Encryption**: Provides both confidentiality and integrity using AES-GCM.
     - **Integrity Protection**: Validates data with AES-GCM's authentication tag to detect tampering.
-    - **Context Binding**: Supports Additional Associated Data (AAD) to securely tie ciphertext to a specific context.
+    - **Context Binding**: Supports AAD to securely tie ciphertext to a specific context.
   - **Password-Derived Keys**: Safely derives encryption keys from passwords via PBKDF2.
   - **Key Hierarchy**: Implements secure key separation using Key Encryption Keys (KEKs) and Data Encryption Keys (DEKs).
 - **Easy-to-Use API**:
   A single, intuitive `CryptoManager` class makes data sealing and unsealing straightforward.
 - **Cross-Platform Compatibility**:
   Runs on Deno, Node.js, Bun, and modern browsers, leveraging only the native Web Crypto API and standard builtins.
-  ([See compatibility details](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API#browser_compatibility))
+  See [compatibility details](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API#browser_compatibility).
 
 ## Installation
 
@@ -94,7 +94,7 @@ if (unsealed) {
 
 ### Advanced Usage with AAD
 
-You can use Additional Associated Data (AAD) to bind the encrypted data to its context. This data is authenticated but not encrypted. If the AAD doesn't match during unsealing, the operation will fail.
+You can use Additional Authenticated Data (AAD) to bind the encrypted data to its context. This data is authenticated but not encrypted. If the AAD doesn't match during unsealing, the operation will fail.
 
 ```ts
 import { CryptoManager } from 'gcmwrap'
@@ -120,6 +120,59 @@ const tampered = await manager.unseal(sealed, { aad: { documentId: 'doc-abc-123'
 console.log('Unseal attempt with wrong AAD:', tampered) // undefined
 ```
 
+> [!IMPORTANT]
+> AAD must serialize to the **exact same byte sequence** during both sealing and unsealing. With the default `JSON.stringify`, even differences in object key order will cause verification to fail. To avoid this, you can provide custom `encode` and `decode` functions that ensure consistent serialization.
+
+### Custom Encoding/Decoding
+
+> [!NOTE]
+> The same encoder is also applied to your **sealed data**, not just AAD. You must make sure the chosen encoder/decoder preserves your data correctly:
+>
+> - The default encoder uses `JSON.stringify` with a pre-check that validates the object will survive a round-trip.
+> - Other encoders like CBOR or MessagePack may silently drop unsupported types without throwing an error, which could lead to data loss on unseal.
+
+#### Example with CBOR
+
+```ts
+import { decode, encode } from 'cbor2'
+
+const password = 'custom-encoding-password'
+const data = { info: 'Using CBOR for encoding' }
+
+const manager = await CryptoManager.fromPassword(password, {
+  encode: (data) => encode(data, { cde: true }), // or dcbor: true
+  decode: (bytes) => decode(bytes, { cde: true }),
+})
+
+const aad = { user: 'alice', userId: 42 }
+const sealed = await manager.seal(data, { aad })
+
+// Even though the key order differs, CDE ensures deterministic encoding
+const aad2 = { userId: 42, user: 'alice' }
+const unsealed = await manager.unseal(sealed, { aad: aad2 })
+
+console.log('Unsealed with custom encoding:', unsealed) // { info: '...' }
+```
+
+Alternative:
+
+```ts
+import { decode, encode } from 'cborg'
+
+const manager = await CryptoManager.fromPassword(password, { encode, decode })
+```
+
+#### Example with MessagePack
+
+```ts
+import { decode, encode } from '@msgpack/msgpack'
+
+const manager = await CryptoManager.fromPassword(password, {
+  encode: (data) => encode(data, { sortKeys: true }),
+  decode,
+})
+```
+
 ## API Reference
 
 See [docs](https://www.jsdocs.io/package/gcmwrap).
@@ -130,9 +183,9 @@ See [docs](https://www.jsdocs.io/package/gcmwrap).
 
 1. **Key Derivation**: Your password is never used directly as an encryption key. Instead, it's combined with a unique, cryptographically random **16-byte salt** and stretched using **PBKDF2 with 600,000 iterations** of SHA-256. This produces a strong **Key Encryption Key (KEK)** and makes brute-force attacks on the password computationally expensive.
 
-2. **Key Wrapping**: For each `seal` operation, a new, ephemeral **Data Encryption Key (DEK)** is generated. This DEK is used to encrypt your data. The DEK is then "wrapped" (encrypted) by the KEK using **AES-KW (Key Wrap)**.
+2. **Key Wrapping**: For each `seal` operation, a new, ephemeral **Data Encryption Key (DEK)** is generated. This DEK is used to encrypt your data. The DEK is then "wrapped" (encrypted) by the KEK using **AES-KW**.
 
-3. **Authenticated Encryption**: Your actual data is encrypted using **AES-256-GCM**, an Authenticated Encryption with Associated Data (AEAD) cipher. This provides both confidentiality (encryption) and integrity/authenticity (an authentication tag that detects tampering).
+3. **Authenticated Encryption**: Your actual data is encrypted using **AES-256-GCM**, an Authenticated Encryption with Associated Data (AEAD) cipher. This provides both confidentiality and integrity.
 
 The final sealed output is a dot-separated string containing the version, salt, IV, wrapped DEK, and the ciphertext, all encoded in URL-safe Base64:
 

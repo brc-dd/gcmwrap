@@ -1,8 +1,6 @@
-import { isUint8Array } from 'npm:uint8array-extras@^1.5.0'
-
 export function isJson(v: unknown): boolean {
   const t = typeof v
-  if (v === null || t === 'string' || t === 'boolean' || isUint8Array(v)) return true
+  if (v === null || t === 'string' || t === 'boolean') return true
   if (t === 'number') return Number.isFinite(v)
   if (t !== 'object') return false
 
@@ -18,7 +16,7 @@ export function isJson(v: unknown): boolean {
       while (i--) {
         const v = o[i]
         const t = typeof v
-        if (v === null || t === 'string' || t === 'boolean' || isUint8Array(v)) continue
+        if (v === null || t === 'string' || t === 'boolean') continue
         if (t === 'number') {
           if (!Number.isFinite(v)) return false
           continue
@@ -42,7 +40,7 @@ export function isJson(v: unknown): boolean {
       const k = keys[i]!
       const v = (o as Record<string, unknown>)[k]
       const tv = typeof v
-      if (v == null || tv === 'string' || tv === 'boolean' || isUint8Array(v)) continue
+      if (v == null || tv === 'string' || tv === 'boolean') continue
       if (tv === 'number') {
         if (!Number.isFinite(v)) return false
         continue
