@@ -119,7 +119,7 @@ console.log('Unseal attempt with wrong AAD:', tampered) // undefined
 > [!NOTE]
 > The same encoder is also applied to your **sealed data**, not just AAD. You must make sure the chosen encoder/decoder preserves your data correctly:
 >
-> - The default encoder uses `JSON.stringify` with a pre-check that validates the object will survive a round-trip.
+> - The default encoder uses `JSON.stringify` and performs a pre-check to verify the data can be losslessly round-tripped (encoded and then decoded without change).
 > - Other encoders like CBOR or MessagePack may silently drop unsupported types without throwing an error, which could lead to data loss on unseal.
 
 #### Example with CBOR
@@ -229,7 +229,7 @@ const unsealed = await unseal(key, sealed) // unseal data with KEK
 
 See [docs](https://www.jsdocs.io/package/gcmwrap).
 
-## Security
+## How It Works
 
 `gcmwrap` is designed with security as the top priority. It implements a **Key Encapsulation Mechanism (KEM)** to protect your data.
 
@@ -251,6 +251,35 @@ It is especially useful for **offline applications** where data needs to be encr
 
 - Even if an attacker gains access to the sealed data, they cannot decrypt it without the correct password.
 - Each sealed payload is protected by a **unique Data Encryption Key (DEK)**. This means that even if one blob was somehow brute-forced, the compromised key would not help in decrypting any other encrypted blobs.
+
+## Security Considerations
+
+Most cryptographic failures stem from **misuse of primitives**, not from weaknesses in the algorithms themselves. Keep the following in mind when using this library:
+
+### Passwords and Key Derivation
+
+- **Password Strength**: Encryption is only as strong as the password chosen. Always use strong, high-entropy passwords.
+- **Iteration Count**: By default, PBKDF2 runs with 600,000 iterations - a balance between security and performance. You may raise this for stronger protection, but higher counts will slow down key derivation.
+- **Avoid Unbounded Parameters**: Never use unbounded or excessively large iteration counts (or similar parameters). They may cause denial-of-service conditions by making legitimate operations impractically slow or consuming excessive resources.
+
+### Usage Guidelines
+
+- **Not for Password Storage**: Do **not** use this library to encrypt or store user passwords. Instead, rely on established authentication flows and server-side, one-way hashing with a modern KDF such as Argon2.
+- **Runtime Environment**: This library builds on the Web Crypto API, which is considered secure. Make sure your environment (browser, Node.js, etc.) is up-to-date and not compromised.
+
+### Memory Safety
+
+- JavaScript does not provide guarantees about clearing sensitive data from memory. Secrets such as plaintext passwords may remain in memory longer than intended. For high-sensitivity use cases, consider secure runtimes, native modules, or languages that support explicit memory clearing and stronger isolation.
+
+### A Note from MDN
+
+From [MDN's Web Crypto API documentation](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API):
+
+> The Web Crypto API provides a number of low-level cryptographic primitives. It's very easy to misuse them, and the pitfalls involved can be very subtle.
+>
+> Even assuming you use the basic cryptographic functions correctly, secure key management and overall security system design are extremely hard to get right, and are generally the domain of specialist security experts.
+>
+> Errors in security system design and implementation can make the security of the system completely ineffective.
 
 ## Credits
 
