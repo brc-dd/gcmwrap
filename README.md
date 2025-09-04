@@ -11,11 +11,8 @@ A lightweight and secure JavaScript encryption library offering authenticated en
     - **Context Binding**: Supports AAD to securely tie ciphertext to a specific context.
   - **Password-Derived Keys**: Safely derives encryption keys from passwords via PBKDF2.
   - **Key Hierarchy**: Implements secure key separation using Key Encryption Keys (KEKs) and Data Encryption Keys (DEKs).
-- **Easy-to-Use API**:
-  A single, intuitive `CryptoManager` class makes data sealing and unsealing straightforward.
-- **Cross-Platform Compatibility**:
-  Runs on Deno, Node.js, Bun, and modern browsers, leveraging only the native Web Crypto API and standard builtins.
-  See [compatibility details](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API#browser_compatibility).
+- **Easy-to-Use API**: A single, intuitive `CryptoManager` class makes data sealing and unsealing straightforward.
+- **Cross-Platform Compatibility**: Runs on Deno, Node.js, Bun, and modern browsers, leveraging only the native Web Crypto API and standard builtins. See [compatibility details](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API#browser_compatibility).
 
 ## Installation
 
@@ -63,15 +60,11 @@ import { CryptoManager } from 'https://esm.sh/gcmwrap@1'
 
 ## Usage
 
-The recommended entry point for `gcmwrap` is the `CryptoManager` class, which
-takes care of key derivation, encryption, authentication, and key wrapping for
-you.
+The recommended entry point for `gcmwrap` is the `CryptoManager` class, which takes care of key derivation, encryption, authentication, and key wrapping for you.
 
 ### Basic Example
 
 ```ts
-import { CryptoManager } from 'gcmwrap'
-
 const password = 'a-very-strong-and-secret-password'
 const secret = { message: 'This is top secret!' }
 
@@ -97,8 +90,6 @@ if (unsealed) {
 You can use Additional Authenticated Data (AAD) to bind the encrypted data to its context. This data is authenticated but not encrypted. If the AAD doesn't match during unsealing, the operation will fail.
 
 ```ts
-import { CryptoManager } from 'gcmwrap'
-
 const password = 'another-strong-password'
 const report = { content: 'Confidential quarterly report' }
 
@@ -171,6 +162,67 @@ const manager = await CryptoManager.fromPassword(password, {
   encode: (data) => encode(data, { sortKeys: true }),
   decode,
 })
+```
+
+### Custom Iteration Count
+
+You can tune PBKDF2 iterations when creating the manager. For example, to set 1M iterations (default is 600K):
+
+```ts
+import { CryptoManager } from 'gcmwrap'
+
+const manager = await CryptoManager.fromPassword(password, {
+  iterations: 1_000_000,
+})
+```
+
+### App-Level Versioning
+
+You may want to evolve parameters (e.g., iterations) over time while keeping old data readable. One pattern is to **prefix** the sealed token with a version (not secret), **bind that version in AAD**, and **override options per call** using **method-level options** (which merge with instance options).
+
+```ts
+const manager = await CryptoManager.fromPassword(password, {
+  iterations: 1_000_000, // default for new data
+})
+
+const v = 2 // current app version
+
+async function seal(data: unknown) {
+  return `${v}.${await manager.seal(data, { aad: { v } })}` // bind version in AAD
+}
+
+function unseal(sealed: string) {
+  const [ver, ...rest] = sealed.split('.')
+  const payload = rest.join('.')
+
+  if (ver === '1') {
+    // Old version with fewer iterations
+    return manager.unseal(payload, { aad: { v: 1 }, iterations: 600_000 })
+  }
+
+  if (ver === '2') {
+    // Current version (default params)
+    return manager.unseal(payload, { aad: { v: 2 } })
+  }
+
+  // Unknown version
+  return undefined
+
+  // Alternatively, fall back for unprefixed legacy tokens:
+  // return manager.unseal(sealed, { iterations: 600_000 })
+}
+```
+
+### Lower-Level API
+
+If you don't want to use the `CryptoManager` class, you can use these functions directly. They have a similar API as the methods on `CryptoManager` but require you to pass the KEK as the first argument.
+
+```ts
+import { generateKey, seal, unseal } from 'gcmwrap'
+
+const key = await generateKey(password) // derive KEK from password
+const sealed = await seal(key, secret) // seal data with KEK
+const unsealed = await unseal(key, sealed) // unseal data with KEK
 ```
 
 ## API Reference

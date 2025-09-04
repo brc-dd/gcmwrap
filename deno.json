@@ -4,7 +4,7 @@
   "exports": "./mod.ts",
   "fmt": {
     "lineWidth": 100,
-    "proseWrap": "preserve",
+    "proseWrap": "never",
     "semiColons": false,
     "singleQuote": true
   },
