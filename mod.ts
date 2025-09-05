@@ -9,7 +9,7 @@ const dec = new TextDecoder('utf-8', { fatal: true })
 
 const v = 1
 const header = toBase64(Uint8Array.of(v))
-
+const fakeBase = `${header}.${toBase64(new Uint8Array(16))}.${toBase64(new Uint8Array(12))}`
 const fakeDekPromise = crypto.subtle.importKey(
   'raw',
   new Uint8Array(32),
@@ -37,27 +37,19 @@ export interface SealOptions {
    * A function to encode the input data into a Uint8Array before encryption.
    * @default // A function that handles JSON-serializable data.
    */
-  encode?: (data: unknown) => Uint8Array
+  encode?: (data: unknown) => Uint8Array | Promise<Uint8Array>
   /**
    * A function to decode a Uint8Array back into the original data format after decryption.
    * @default // A function that parses a UTF-8 string as JSON.
    */
-  decode?: (data: Uint8Array) => unknown
+  decode?: (data: Uint8Array) => unknown | Promise<unknown>
 }
 
-/**
- * Represents the structure of the version 1 sealed data payload.
- */
-export interface SealedV1 {
-  /** The version identifier (always 1 for this version). */
-  v: 1
-  /** The 16-byte salt used for PBKDF2 key derivation. */
+interface SealedV1 {
+  base: string
   s: Uint8Array
-  /** The 12-byte initialization vector (IV) used for AES-GCM encryption. */
   iv: Uint8Array
-  /** The 40-byte wrapped (encrypted) Data Encryption Key (DEK). */
   w: Uint8Array
-  /** The ciphertext (encrypted data). */
   ct: Uint8Array
 }
 
@@ -124,12 +116,14 @@ export async function seal(
 
   const s = crypto.getRandomValues(new Uint8Array(16))
   const iv = crypto.getRandomValues(new Uint8Array(12))
-  const aad = encode({ v, it, s, custom })
+
+  const base = `${header}.${toBase64(s)}.${toBase64(iv)}`
+  const aad = await encode({ base, custom })
 
   const ct = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv, additionalData: aad, tagLength: 128 },
     dek,
-    encode(data),
+    await encode(data),
   )
 
   const kek = await crypto.subtle.deriveKey(
@@ -147,8 +141,7 @@ export async function seal(
     { name: 'AES-KW' },
   )
 
-  return `${header}.${toBase64(s)}.${toBase64(iv)}.` +
-    `${toBase64(new Uint8Array(w))}.${toBase64(new Uint8Array(ct))}`
+  return `${base}.${toBase64(new Uint8Array(w))}.${toBase64(new Uint8Array(ct))}`
 }
 
 /**
@@ -174,6 +167,7 @@ export async function unseal(
 ): Promise<unknown> {
   try {
     const {
+      base,
       s = new Uint8Array(16),
       iv = new Uint8Array(12),
       w = new Uint8Array(40),
@@ -182,7 +176,7 @@ export async function unseal(
     } = parseSealedV1(sealed)
 
     let isValid = ok
-    const aad = encode({ v: 1, it, s, custom })
+    const aad = await encode({ base: isValid ? base : fakeBase, custom })
 
     const kek = await crypto.subtle.deriveKey(
       { name: 'PBKDF2', salt: s, iterations: it, hash: 'SHA-256' },
@@ -214,7 +208,13 @@ export async function unseal(
       return new ArrayBuffer(0)
     })
 
-    const data = decode(new Uint8Array(pt))
+    const data = await Promise.resolve(
+      decode(new Uint8Array(pt)),
+    ).catch(() => {
+      isValid = false
+      return undefined
+    })
+
     return isValid ? data : undefined
   } catch {
     return undefined
@@ -297,7 +297,7 @@ function parseSealedV1(sealed: string): Partial<SealedV1> & { ok: boolean } {
     ok &&= iv?.byteLength === 12
     ok &&= w?.byteLength === 40
     ok &&= !!ct && ct.byteLength >= 16
-    return { v, s, iv, w, ct, ok }
+    return { base: `${parts[0]}.${parts[1]}.${parts[2]}`, s, iv, w, ct, ok }
   } catch {
     return { ok: false }
   }
