@@ -1,6 +1,6 @@
 {
   "name": "gcmwrap",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Secure, lightweight JavaScript library for AES-GCM encryption with key wrapping.",
   "keywords": [
     "encryption",
