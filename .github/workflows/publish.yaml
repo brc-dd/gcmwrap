@@ -15,13 +15,14 @@ jobs:
       - uses: lewagon/wait-on-check-action@v1.4.0
         with:
           ref: ${{ github.ref }}
-          check-name: 'Test'
+          check-name: 'test'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@latest
       - uses: denoland/setup-deno@v2
       - run: deno task build
       - run: cd dist && npm publish
