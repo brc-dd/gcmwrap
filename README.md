@@ -277,12 +277,6 @@ From [MDN's Web Crypto API documentation](https://developer.mozilla.org/en-US/do
 >
 > Errors in security system design and implementation can make the security of the system completely ineffective.
 
-## Performance Tips
-
-- **Derive once, reuse**: Create a `CryptoManager` instance per password and reuse it for multiple `seal`/`unseal` operations to amortize PBKDF2 cost.
-- **Batch work**: If you must process many items, derive once, then parallelize `seal`/`unseal` calls using `Promise.all`.
-- **Persist tokens, not keys**: Store only sealed tokens (e.g., in IndexedDB/localStorage). Never persist raw keys or passwords.
-
 ## FAQs
 
 - **Why PBKDF2 and not Argon2/script?**\
