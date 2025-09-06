@@ -1,6 +1,6 @@
 {
   "name": "gcmwrap",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Secure, lightweight JavaScript library for AES-GCM encryption with key wrapping.",
   "keywords": [
     "encryption",
@@ -33,7 +33,7 @@
     "update": "deno task run #/update.ts"
   },
   "imports": {
-    "#/": "https://raw.githubusercontent.com/globalbrain/hado/v0.18.0/scripts/",
+    "#/": "https://raw.githubusercontent.com/globalbrain/hado/v0.18.1/scripts/",
     "@msgpack/msgpack": "npm:@msgpack/msgpack@^3.1.2",
     "@std/assert": "jsr:@std/assert@^1.0.14",
     "cbor2": "npm:cbor2@^2.0.1",
