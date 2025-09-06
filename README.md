@@ -58,11 +58,9 @@ For direct browser use, you can import from `esm.sh`:
 import { CryptoManager } from 'https://esm.sh/gcmwrap@1'
 ```
 
-## Usage
+## Quick Start
 
 The recommended entry point for `gcmwrap` is the `CryptoManager` class, which takes care of key derivation, encryption, authentication, and key wrapping for you.
-
-### Basic Example
 
 ```ts
 const password = 'a-very-strong-and-secret-password'
@@ -85,9 +83,15 @@ if (unsealed) {
 }
 ```
 
-### Advanced Usage with AAD
+## API Reference
 
-You can use Additional Authenticated Data (AAD) to bind the encrypted data to its context. This data is authenticated but not encrypted. If the AAD doesn't match during unsealing, the operation will fail.
+See [docs](https://www.jsdocs.io/package/gcmwrap).
+
+## Advanced Usage
+
+### Additional Authenticated Data (AAD)
+
+You can use AAD to bind the encrypted data to its context. This data is authenticated but not encrypted. If the AAD doesn't match during unsealing, the operation will fail.
 
 ```ts
 const password = 'another-strong-password'
@@ -107,17 +111,17 @@ const unsealed = await manager.unseal(sealed, { aad })
 console.log('Unsealed:', unsealed) // { content: '...' }
 
 // If you try to unseal with different AAD, it will fail
-const tampered = await manager.unseal(sealed, { aad: { documentId: 'doc-abc-123' } })
-console.log('Unseal attempt with wrong AAD:', tampered) // undefined
+const unsealed2 = await manager.unseal(sealed, { aad: { documentId: 'doc-abc-123' } })
+console.log('Unseal attempt with wrong AAD:', unsealed2) // undefined
 ```
 
 > [!IMPORTANT]
-> AAD must serialize to the **exact same byte sequence** during both sealing and unsealing. With the default `JSON.stringify`, even differences in object key order will cause verification to fail. To avoid this, you can provide custom `encode` and `decode` functions that ensure consistent serialization.
+> AAD must serialize to the exact same byte sequence during both sealing and unsealing. With the default `JSON.stringify`, even differences in object key order will cause verification to fail. To avoid this, you can provide custom `encode` and `decode` functions that ensure consistent serialization.
 
 ### Custom Encoding/Decoding
 
 > [!NOTE]
-> The same encoder is also applied to your **sealed data**, not just AAD. You must make sure the chosen encoder/decoder preserves your data correctly:
+> The same encoder is also applied to your data before sealing, not just AAD. You must make sure the chosen encoder/decoder preserves your data correctly:
 >
 > - The default encoder uses `JSON.stringify` and performs a pre-check to verify the data can be losslessly round-tripped (encoded and then decoded without change).
 > - Other encoders like CBOR or MessagePack may silently drop unsupported types without throwing an error, which could lead to data loss on unseal.
@@ -178,7 +182,7 @@ const manager = await CryptoManager.fromPassword(password, {
 
 ### App-Level Versioning
 
-You may want to evolve parameters (e.g., iterations) over time while keeping old data readable. One pattern is to **prefix** the sealed token with a version (not secret), **bind that version in AAD**, and **override options per call** using **method-level options** (which merge with instance options).
+You may want to evolve parameters (e.g., iteration count) over time while keeping old data readable. A common pattern is to prefix the sealed token with a version (not secret), bind that version in AAD, and override options per call using method-level options (which merge with instance options).
 
 ```ts
 const manager = await CryptoManager.fromPassword(password, {
@@ -225,10 +229,6 @@ const sealed = await seal(key, secret) // seal data with KEK
 const unsealed = await unseal(key, sealed) // unseal data with KEK
 ```
 
-## API Reference
-
-See [docs](https://www.jsdocs.io/package/gcmwrap).
-
 ## How It Works
 
 `gcmwrap` is designed with security as the top priority. It implements a **Key Encapsulation Mechanism (KEM)** to protect your data.
@@ -239,22 +239,36 @@ See [docs](https://www.jsdocs.io/package/gcmwrap).
 
 3. **Authenticated Encryption**: Your actual data is encrypted using **AES-256-GCM**, an Authenticated Encryption with Associated Data (AEAD) cipher. This provides both confidentiality and integrity.
 
+### Data Format
+
 The final sealed output is a dot-separated string containing the version, salt, IV, wrapped DEK, and the ciphertext, all encoded in URL-safe Base64:
 
 ```txt
 [version].[salt].[iv].[wrapped_key].[ciphertext]
 ```
 
-This library is built specifically for **client-side encryption in web applications**, unlike my earlier project [iron-webcrypto](https://github.com/brc-dd/iron-webcrypto), which did not focus on that use case.
+- **Version**: Indicates the format version (currently `1`).
+- **Salt**: The random salt used for PBKDF2 (16 bytes).
+- **IV**: The random initialization vector for AES-GCM (12 bytes).
+- **Wrapped Key**: The DEK encrypted with the KEK (40 bytes).
+- **Ciphertext**: The encrypted data along with the authentication tag.
 
-It is especially useful for **offline applications** where data needs to be encrypted with a user-supplied password and stored locally (e.g., in Local Storage or IndexedDB). With this approach:
+### Error Handling
+
+`unseal` returns `undefined` if any error occurs. This is to avoid leaking information about what went wrong (e.g., whether the password was incorrect or the data was tampered with). Treat `undefined` as a hard failure and do not reuse any partial state from the failed attempt.
+
+## Use Cases
+
+This library is built specifically for client-side encryption in web applications, unlike my earlier project [iron-webcrypto](https://github.com/brc-dd/iron-webcrypto), which did not focus on that use case.
+
+It is especially useful for offline applications where data needs to be encrypted with a user-supplied password and stored locally (e.g., in Local Storage or IndexedDB). With this approach:
 
 - Even if an attacker gains access to the sealed data, they cannot decrypt it without the correct password.
-- Each sealed payload is protected by a **unique Data Encryption Key (DEK)**. This means that even if one blob was somehow brute-forced, the compromised key would not help in decrypting any other encrypted blobs.
+- Each sealed payload is protected by a unique Data Encryption Key (DEK). This means that even if one blob was somehow brute-forced, the compromised key would not help in decrypting any other encrypted blobs.
 
 ## Security Considerations
 
-Most cryptographic failures stem from **misuse of primitives**, not from weaknesses in the algorithms themselves. Keep the following in mind when using this library:
+Most cryptographic failures stem from misuse of primitives, not from weaknesses in the algorithms themselves. Keep the following in mind when using this library:
 
 ### Passwords and Key Derivation
 
@@ -269,7 +283,7 @@ Most cryptographic failures stem from **misuse of primitives**, not from weaknes
 
 ### Memory Safety
 
-- JavaScript does not provide guarantees about clearing sensitive data from memory. Secrets such as plaintext passwords may remain in memory longer than intended. For high-sensitivity use cases, consider secure runtimes, native modules, or languages that support explicit memory clearing and stronger isolation.
+- JavaScript does not provide guarantees about clearing sensitive data from memory. Secrets such as plaintext passwords may remain in memory longer than intended. For high-sensitivity use cases, consider secure runtimes, native modules, or languages that support explicit memory management and stronger isolation.
 
 ### A Note from MDN
 
@@ -280,6 +294,21 @@ From [MDN's Web Crypto API documentation](https://developer.mozilla.org/en-US/do
 > Even assuming you use the basic cryptographic functions correctly, secure key management and overall security system design are extremely hard to get right, and are generally the domain of specialist security experts.
 >
 > Errors in security system design and implementation can make the security of the system completely ineffective.
+
+## Performance Tips
+
+- **Derive once, reuse**: Create a `CryptoManager` instance per password and reuse it for multiple `seal`/`unseal` operations to amortize PBKDF2 cost.
+- **Batch work**: If you must process many items, derive once, then parallelize `seal`/`unseal` calls using `Promise.all`.
+- **Persist tokens, not keys**: Store only sealed tokens (e.g., in IndexedDB/localStorage). Never persist raw keys or passwords.
+
+## FAQs
+
+- **Why PBKDF2 and not Argon2/script?**\
+  The Web Crypto API does not support Argon2 or scrypt (<https://github.com/WICG/proposals/issues/59>). PBKDF2 with a high iteration count is a reasonable alternative for password-based key derivation in this context. If/when Argon2 becomes available natively, future versions could support it.
+- **What does AAD actually protect?**\
+  AAD is included in the authentication tag of AES-GCM. This means that if the AAD is altered or does not match during unsealing, the decryption will fail. It effectively binds the ciphertext to its context, preventing certain types of attacks where an attacker might try to reuse ciphertext in a different context.
+- **Can I change the encoder later?**\
+  Yes, but treat it like a format change. Either re-seal existing data with the new encoder or maintain versioning in your application to handle different encodings.
 
 ## Credits
 
