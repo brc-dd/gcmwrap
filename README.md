@@ -37,7 +37,7 @@ import { CryptoManager } from 'gcmwrap'
 For direct browser use, you can import from `esm.sh`:
 
 ```ts
-import { CryptoManager } from 'https://esm.sh/gcmwrap@1'
+import { CryptoManager } from 'https://esm.sh/gcmwrap@0'
 ```
 
 ## Quick Start
