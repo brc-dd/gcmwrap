@@ -1,5 +1,5 @@
 import { CryptoManager, generateKey, seal, unseal } from 'gcmwrap'
-import { assert, assertEquals, assertNotEquals } from 'jsr:@std/assert'
+import { assert, assertEquals, assertNotEquals, assertRejects } from 'jsr:@std/assert'
 import { decode as msgpackdecode, encode as msgpackencode } from 'npm:@msgpack/msgpack'
 import { decode as cbor2decode, encode as cbor2encode } from 'npm:cbor2'
 import { decode as cborgdecode, encode as cborgencode } from 'npm:cborg'
@@ -238,8 +238,98 @@ Deno.test('generateKey', async (t) => {
 Deno.test('seal/unseal', async (t) => {
   await t.step('should perform a basic roundtrip', async () => {
     const key = await generateKey(password)
-    const sealed = await seal(key, data, { iterations: 100 })
-    const unsealedData = await unseal(key, sealed, { iterations: 100 })
+    const sealed = await seal(key, data)
+    const unsealedData = await unseal(key, sealed)
     assertEquals(unsealedData, data)
+  })
+
+  await t.step('should work with non-object data', async () => {
+    const key = await generateKey(password)
+
+    const stringData = 'test string'
+    const sealedString = await seal(key, stringData)
+    assertEquals(await unseal(key, sealedString), stringData)
+
+    const numberData = 123.45
+    const sealedNumber = await seal(key, numberData)
+    assertEquals(await unseal(key, sealedNumber), numberData)
+
+    const arrayData = [1, 'two', { three: 3 }]
+    const sealedArray = await seal(key, arrayData)
+    assertEquals(await unseal(key, sealedArray), arrayData)
+  })
+
+  await t.step('should reject non-JSON-serializable data by default', async () => {
+    const key = await generateKey(password)
+
+    // deno-lint-ignore no-explicit-any
+    const circularReference: any = { data: 123 }
+    circularReference.myself = circularReference
+    await assertRejects(
+      () => seal(key, circularReference),
+      TypeError,
+      'Data is not JSON-serializable',
+    )
+
+    const dateData = new Date()
+    await assertRejects(
+      () => seal(key, dateData),
+      TypeError,
+      'Data is not JSON-serializable',
+    )
+  })
+
+  await t.step('should fail with malformed input', async (t) => {
+    const key = await generateKey(password)
+
+    await t.step('too few parts', async () => {
+      const sealed = 'a.b.c'
+      const unsealed = await unseal(key, sealed)
+      assertEquals(unsealed, undefined)
+    })
+
+    await t.step('invalid base64', async () => {
+      const sealed = 'a.b.c.d.e'
+      const unsealed = await unseal(key, sealed)
+      assertEquals(unsealed, undefined)
+    })
+
+    await t.step('empty string', async () => {
+      const sealed = ''
+      const unsealed = await unseal(key, sealed)
+      assertEquals(unsealed, undefined)
+    })
+  })
+
+  await t.step('should have consistent unseal timing to mitigate timing attacks', async () => {
+    const key = await generateKey(password)
+    const sealed = await seal(key, data)
+
+    const startValid = performance.now()
+    const unsealedValid = await unseal(key, sealed)
+    const durationValid = performance.now() - startValid
+    assertEquals(unsealedValid, data)
+
+    const tamperAndCollectTime = async (field: string, manipulation: (val: Uint8Array) => void) => {
+      const [v, s, iv, w, ct] = sealed.split('.').map(toUint8Array)
+      const payload = { v: v!, s: s!, iv: iv!, w: w!, ct: ct! }
+      manipulation(payload[field as keyof typeof payload])
+      const tampered = Object.values(payload).map((data) => toBase64(data, { urlSafe: true }))
+        .join('.')
+      const start = performance.now()
+      const unsealed = await unseal(key, tampered)
+      const duration = performance.now() - start
+      assertEquals(unsealed, undefined)
+      return duration
+    }
+
+    const fieldsToTamper = ['v', 's', 'iv', 'w', 'ct']
+    for (const field of fieldsToTamper) {
+      const duration = await tamperAndCollectTime(field, (arr) => arr[0]! ^= 0x01)
+      assert(
+        duration >= durationValid * 0.8 && duration <= durationValid * 1.2,
+        `Tampering "${field}" caused unseal time to be out of expected range`,
+      )
+    }
   })
 })
