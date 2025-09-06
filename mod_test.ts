@@ -1,5 +1,8 @@
 import { CryptoManager, generateKey, seal, unseal } from 'gcmwrap'
 import { assert, assertEquals, assertNotEquals } from 'jsr:@std/assert'
+import { decode as msgpackdecode, encode as msgpackencode } from 'npm:@msgpack/msgpack'
+import { decode as cbor2decode, encode as cbor2encode } from 'npm:cbor2'
+import { decode as cborgdecode, encode as cborgencode } from 'npm:cborg'
 
 const password = 'correct-horse-battery-staple-secure-password'
 const data = { foo: 'bar', num: 42, nested: { a: 1, b: [1, 2, 3] } }
@@ -84,11 +87,87 @@ Deno.test('CryptoManager', async (t) => {
       assertEquals(unsealedSuccess, data)
     })
 
-    // await t.step('should succeed regardless of order of AAD properties', async () => {
-    //   const sealed = await managerWithAad.seal(data, { aad: { b: 2, a: 1 } })
-    //   const unsealed = await managerWithAad.unseal(sealed, { aad: { a: 1, b: 2 } })
-    //   assertEquals(unsealed, data)
-    // })
+    await t.step('should fail when order of AAD properties is changed', async () => {
+      const sealed = await managerWithAad.seal(data, { aad: { a: 1, b: 2 } })
+      const unsealed = await managerWithAad.unseal(sealed, { aad: { b: 2, a: 1 } })
+      assertEquals(unsealed, undefined)
+    })
+  })
+
+  await t.step('should support different serialization formats', async (t) => {
+    const formats = [
+      {
+        name: 'CBOR (cbor2 / cde)',
+        encode: (data: unknown) => cbor2encode(data, { cde: true }),
+        decode: (data: Uint8Array) => cbor2decode(data, { cde: true }),
+      },
+      {
+        name: 'CBOR (cbor2 / dcbor)',
+        encode: (data: unknown) => cbor2encode(data, { dcbor: true, rejectUndefined: false }),
+        decode: (data: Uint8Array) => cbor2decode(data, { dcbor: true, rejectUndefined: true }),
+      },
+      {
+        name: 'CBOR (cborg)',
+        encode: cborgencode,
+        decode: cborgdecode,
+      },
+      {
+        name: 'MessagePack',
+        encode: (data: unknown) => msgpackencode(data, { sortKeys: true }),
+        decode: msgpackdecode,
+      },
+    ]
+
+    for (const fmt of formats) {
+      await t.step(`using ${fmt.name}`, async (t) => {
+        const manager = await CryptoManager.fromPassword(password, {
+          encode: fmt.encode,
+          decode: fmt.decode,
+        })
+
+        await t.step('should seal and unseal data correctly', async () => {
+          const sealed = await manager.seal(data)
+          const unsealed = await manager.unseal(sealed)
+          assertEquals(unsealed, data)
+        })
+
+        await t.step('should work with AAD', async () => {
+          const sealed = await manager.seal(data, { aad })
+          const unsealed = await manager.unseal(sealed, { aad })
+          assertEquals(unsealed, data)
+        })
+
+        await t.step('should work with different key order in AAD', async () => {
+          const aad1 = { x: 1, y: 2 }
+          const aad2 = { y: 2, x: 1 }
+          const sealed = await manager.seal(data, { aad: aad1 })
+          const unsealed = await manager.unseal(sealed, { aad: aad2 })
+          assertEquals(unsealed, data)
+        })
+
+        await t.step('should fail with incorrect AAD', async () => {
+          const sealed = await manager.seal(data, { aad })
+          const unsealed = await manager.unseal(sealed, { aad: { context: 'wrong' } })
+          assertEquals(unsealed, undefined)
+        })
+
+        await t.step('should allow additional data types', async () => {
+          const complexData = {
+            nil: null,
+            integer: 1,
+            float: Math.PI,
+            string: 'Hello, world!',
+            binary: Uint8Array.from([1, 2, 3]),
+            array: [10, 20, 30],
+            map: { foo: 'bar' },
+            bool: true,
+          }
+          const sealed = await manager.seal(complexData)
+          const unsealed = await manager.unseal(sealed)
+          assertEquals(unsealed, complexData)
+        })
+      })
+    }
   })
 
   // await t.step('should handle custom PBKDF2 iterations', async (t) => {

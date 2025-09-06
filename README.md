@@ -135,7 +135,7 @@ const password = 'custom-encoding-password'
 const data = { info: 'Using CBOR for encoding' }
 
 const manager = await CryptoManager.fromPassword(password, {
-  encode: (data) => encode(data, { cde: true }), // or dcbor: true
+  encode: (data) => encode(data, { cde: true }),
   decode: (bytes) => decode(bytes, { cde: true }),
 })
 
