@@ -12,6 +12,11 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - uses: lewagon/wait-on-check-action@v1.4.0
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'Test'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
