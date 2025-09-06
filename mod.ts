@@ -1,7 +1,7 @@
 import {
   base64ToUint8Array as _base64ToUint8Array,
   uint8ArrayToBase64 as _uint8ArrayToBase64,
-} from 'npm:uint8array-extras@^1.5.0'
+} from 'uint8array-extras'
 import { isJson } from './utils.ts'
 
 const enc = new TextEncoder()

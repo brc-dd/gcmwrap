@@ -1,12 +1,12 @@
+import { decode as msgpackdecode, encode as msgpackencode } from '@msgpack/msgpack'
+import { assert, assertEquals, assertNotEquals, assertRejects } from '@std/assert'
+import { decode as cbor2decode, encode as cbor2encode } from 'cbor2'
+import { decode as cborgdecode, encode as cborgencode } from 'cborg'
 import { CryptoManager, generateKey, seal, unseal } from 'gcmwrap'
-import { assert, assertEquals, assertNotEquals, assertRejects } from 'jsr:@std/assert'
-import { decode as msgpackdecode, encode as msgpackencode } from 'npm:@msgpack/msgpack'
-import { decode as cbor2decode, encode as cbor2encode } from 'npm:cbor2'
-import { decode as cborgdecode, encode as cborgencode } from 'npm:cborg'
 import {
   base64ToUint8Array as toUint8Array,
   uint8ArrayToBase64 as toBase64,
-} from 'npm:uint8array-extras@^1.5.0'
+} from 'uint8array-extras'
 
 const password = 'correct-horse-battery-staple-secure-password'
 const data = { foo: 'bar', num: 42, nested: { a: 1, b: [1, 2, 3] } }

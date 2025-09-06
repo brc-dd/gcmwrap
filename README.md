@@ -32,24 +32,6 @@ Then import it as:
 import { CryptoManager } from 'gcmwrap'
 ```
 
-### JSR
-
-If you're using JSR, install with one of the following:
-
-```sh
-npx jsr add @brc-dd/gcmwrap
-pnpx jsr add @brc-dd/gcmwrap
-yarn dlx jsr add @brc-dd/gcmwrap
-bunx jsr add @brc-dd/gcmwrap
-deno add @brc-dd/gcmwrap
-```
-
-And import via:
-
-```ts
-import { CryptoManager } from '@brc-dd/gcmwrap'
-```
-
 ### Browser
 
 For direct browser use, you can import from `esm.sh`:
