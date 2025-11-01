@@ -2,6 +2,7 @@ import { decode as msgpackdecode, encode as msgpackencode } from '@msgpack/msgpa
 import { assert, assertEquals, assertNotEquals, assertRejects } from '@std/assert'
 import { decode as cbor2decode, encode as cbor2encode } from 'cbor2'
 import { decode as cborgdecode, encode as cborgencode } from 'cborg'
+import { describe, it } from 'cross-bdd'
 import { CryptoManager, generateKey, seal, unseal } from 'gcmwrap'
 import {
   base64ToUint8Array as toUint8Array,
@@ -12,20 +13,20 @@ const password = 'correct-horse-battery-staple-secure-password'
 const data = { foo: 'bar', num: 42, nested: { a: 1, b: [1, 2, 3] } }
 const aad = { context: 'user-session', version: 2 }
 
-Deno.test('CryptoManager', async (t) => {
-  await t.step('should perform a successful seal/unseal roundtrip', async (t) => {
+describe('CryptoManager', () => {
+  describe('seal/unseal roundtrips', async () => {
     const manager = await CryptoManager.fromPassword(password)
 
-    const data_samples = [
-      { description: 'simple object', data: { a: 1, b: 'hello' } },
-      { description: 'string', data: 'just a simple string' },
-      { description: 'number', data: 12345.6789 },
-      { description: 'array', data: [1, 'two', { three: true }] },
+    const dataSamples = [
+      { description: 'a simple object', data: { a: 1, b: 'hello' } },
+      { description: 'a string', data: 'just a simple string' },
+      { description: 'a number', data: 12345.6789 },
+      { description: 'an array', data: [1, 'two', { three: true }] },
       { description: 'null', data: null },
     ]
 
-    for (const sample of data_samples) {
-      await t.step(`with data type: ${sample.description}`, async () => {
+    for (const sample of dataSamples) {
+      it(`seals and unseals ${sample.description}`, async () => {
         const sealed = await manager.seal(sample.data)
         assert(typeof sealed === 'string' && sealed.length > 0)
         const unsealed = await manager.unseal(sealed)
@@ -34,14 +35,14 @@ Deno.test('CryptoManager', async (t) => {
     }
   })
 
-  await t.step('should produce different sealed output for the same input', async () => {
+  it('produces different sealed output for repeated seal calls', async () => {
     const manager = await CryptoManager.fromPassword(password)
     const sealed1 = await manager.seal(data)
     const sealed2 = await manager.seal(data)
     assertNotEquals(sealed1, sealed2)
   })
 
-  await t.step('should work across different instances with the same password', async () => {
+  it('works across different instances sharing the same password', async () => {
     const manager1 = await CryptoManager.fromPassword(password)
     const manager2 = await CryptoManager.fromPassword(password)
     const sealed = await manager1.seal(data)
@@ -49,7 +50,7 @@ Deno.test('CryptoManager', async (t) => {
     assertEquals(unsealed, data)
   })
 
-  await t.step('should fail to unseal with the wrong password', async () => {
+  it('fails to unseal with an incorrect password', async () => {
     const manager1 = await CryptoManager.fromPassword(password)
     const manager2 = await CryptoManager.fromPassword('a-completely-different-password')
     const sealed = await manager1.seal(data)
@@ -57,29 +58,29 @@ Deno.test('CryptoManager', async (t) => {
     assertEquals(unsealed, undefined)
   })
 
-  await t.step('should correctly handle Additional Authenticated Data (AAD)', async (t) => {
+  describe('Additional Authenticated Data (AAD)', async () => {
     const managerWithAad = await CryptoManager.fromPassword(password, { aad })
     const managerWithoutAad = await CryptoManager.fromPassword(password)
 
-    await t.step('should succeed with matching AAD', async () => {
+    it('succeeds with matching AAD', async () => {
       const sealed = await managerWithAad.seal(data)
       const unsealed = await managerWithAad.unseal(sealed)
       assertEquals(unsealed, data)
     })
 
-    await t.step('should fail when AAD is expected but not provided', async () => {
+    it('fails when AAD is expected but omitted', async () => {
       const sealed = await managerWithAad.seal(data)
       const unsealed = await managerWithoutAad.unseal(sealed)
       assertEquals(unsealed, undefined)
     })
 
-    await t.step('should fail with mismatched AAD', async () => {
+    it('fails when AAD does not match', async () => {
       const sealed = await managerWithAad.seal(data)
       const unsealed = await managerWithAad.unseal(sealed, { aad: { context: 'wrong-context' } })
       assertEquals(unsealed, undefined)
     })
 
-    await t.step('should allow per-call AAD to merge with instance AAD', async () => {
+    it('merges per-call AAD with instance AAD', async () => {
       const sealed = await managerWithAad.seal(data, { aad: { additional: true } })
 
       // Fails with only instance AAD
@@ -91,14 +92,14 @@ Deno.test('CryptoManager', async (t) => {
       assertEquals(unsealedSuccess, data)
     })
 
-    await t.step('should fail when order of AAD properties is changed', async () => {
+    it('fails when the order of AAD properties changes', async () => {
       const sealed = await managerWithAad.seal(data, { aad: { a: 1, b: 2 } })
       const unsealed = await managerWithAad.unseal(sealed, { aad: { b: 2, a: 1 } })
       assertEquals(unsealed, undefined)
     })
   })
 
-  await t.step('should support different serialization formats', async (t) => {
+  describe('serialization formats', () => {
     const formats = [
       {
         name: 'CBOR (cbor2 / cde)',
@@ -123,25 +124,25 @@ Deno.test('CryptoManager', async (t) => {
     ]
 
     for (const fmt of formats) {
-      await t.step(`using ${fmt.name}`, async (t) => {
+      describe(`with ${fmt.name}`, async () => {
         const manager = await CryptoManager.fromPassword(password, {
           encode: fmt.encode,
           decode: fmt.decode,
         })
 
-        await t.step('should seal and unseal data correctly', async () => {
+        it('seals and unseals data', async () => {
           const sealed = await manager.seal(data)
           const unsealed = await manager.unseal(sealed)
           assertEquals(unsealed, data)
         })
 
-        await t.step('should work with AAD', async () => {
+        it('handles AAD', async () => {
           const sealed = await manager.seal(data, { aad })
           const unsealed = await manager.unseal(sealed, { aad })
           assertEquals(unsealed, data)
         })
 
-        await t.step('should work with different key order in AAD', async () => {
+        it('treats differently ordered AAD keys as equal', async () => {
           const aad1 = { x: 1, y: 2 }
           const aad2 = { y: 2, x: 1 }
           const sealed = await manager.seal(data, { aad: aad1 })
@@ -149,13 +150,13 @@ Deno.test('CryptoManager', async (t) => {
           assertEquals(unsealed, data)
         })
 
-        await t.step('should fail with incorrect AAD', async () => {
+        it('rejects incorrect AAD', async () => {
           const sealed = await manager.seal(data, { aad })
           const unsealed = await manager.unseal(sealed, { aad: { context: 'wrong' } })
           assertEquals(unsealed, undefined)
         })
 
-        await t.step('should allow additional data types', async () => {
+        it('handles additional data types', async () => {
           const complexData = {
             nil: null,
             integer: 1,
@@ -174,17 +175,17 @@ Deno.test('CryptoManager', async (t) => {
     }
   })
 
-  await t.step('should handle custom PBKDF2 iterations', async (t) => {
+  describe('custom PBKDF2 iterations', async () => {
     // Use a low iteration count for faster tests
     const lowIterManager = await CryptoManager.fromPassword(password, { iterations: 100 })
 
-    await t.step('should use instance-level iterations', async () => {
+    it('uses instance-level iterations', async () => {
       const sealed = await lowIterManager.seal(data)
       const unsealed = await lowIterManager.unseal(sealed)
       assertEquals(unsealed, data)
     })
 
-    await t.step('should allow call-level iterations to override instance-level', async () => {
+    it('allows per-call iterations to override the instance default', async () => {
       const sealed = await lowIterManager.seal(data, { iterations: 200 })
       const unsealed = await lowIterManager.unseal(sealed) // uses 100 iterations, should fail
       assertEquals(unsealed, undefined)
@@ -193,7 +194,7 @@ Deno.test('CryptoManager', async (t) => {
     })
   })
 
-  await t.step('should fail to unseal tampered data', async (t) => {
+  describe('tampered payloads', async () => {
     const manager = await CryptoManager.fromPassword(password, { iterations: 100 })
     const sealed = await manager.seal(data)
     const [v, s, iv, w, ct] = sealed.split('.').map(toUint8Array)
@@ -216,16 +217,16 @@ Deno.test('CryptoManager', async (t) => {
     }
 
     // sanity check
-    await t.step('should succeed without tampering', () => tamperAndTest('ct', () => {}, data))
-    await t.step('by altering the salt', () => tamperAndTest('s', (s) => s[0]! ^= 0x01))
-    await t.step('by altering the IV', () => tamperAndTest('iv', (iv) => iv[0]! ^= 0x01))
-    await t.step('by altering the wrapped key', () => tamperAndTest('w', (w) => w[0]! ^= 0x01))
-    await t.step('by altering the ciphertext', () => tamperAndTest('ct', (ct) => ct[0]! ^= 0x01))
+    it('succeeds without tampering', () => tamperAndTest('ct', () => {}, data))
+    it('fails when altering the salt', () => tamperAndTest('s', (s) => s[0]! ^= 0x01))
+    it('fails when altering the IV', () => tamperAndTest('iv', (iv) => iv[0]! ^= 0x01))
+    it('fails when altering the wrapped key', () => tamperAndTest('w', (w) => w[0]! ^= 0x01))
+    it('fails when altering the ciphertext', () => tamperAndTest('ct', (ct) => ct[0]! ^= 0x01))
   })
 })
 
-Deno.test('generateKey', async (t) => {
-  await t.step('should create a valid PBKDF2 CryptoKey', async () => {
+describe('generateKey', () => {
+  it('creates a valid PBKDF2 CryptoKey', async () => {
     const key = await generateKey(password)
     assert(key instanceof CryptoKey)
     assertEquals(key.type, 'secret')
@@ -235,15 +236,15 @@ Deno.test('generateKey', async (t) => {
   })
 })
 
-Deno.test('seal/unseal', async (t) => {
-  await t.step('should perform a basic roundtrip', async () => {
+describe('seal/unseal', () => {
+  it('performs a basic roundtrip', async () => {
     const key = await generateKey(password)
     const sealed = await seal(key, data)
     const unsealedData = await unseal(key, sealed)
     assertEquals(unsealedData, data)
   })
 
-  await t.step('should work with non-object data', async () => {
+  it('works with non-object data', async () => {
     const key = await generateKey(password)
 
     const stringData = 'test string'
@@ -259,7 +260,7 @@ Deno.test('seal/unseal', async (t) => {
     assertEquals(await unseal(key, sealedArray), arrayData)
   })
 
-  await t.step('should reject non-JSON-serializable data by default', async () => {
+  it('rejects non-JSON-serializable data by default', async () => {
     const key = await generateKey(password)
 
     // deno-lint-ignore no-explicit-any
@@ -279,29 +280,29 @@ Deno.test('seal/unseal', async (t) => {
     )
   })
 
-  await t.step('should fail with malformed input', async (t) => {
+  describe('malformed input', async () => {
     const key = await generateKey(password)
 
-    await t.step('too few parts', async () => {
+    it('returns undefined when payload has too few parts', async () => {
       const sealed = 'a.b.c'
       const unsealed = await unseal(key, sealed)
       assertEquals(unsealed, undefined)
     })
 
-    await t.step('invalid base64', async () => {
+    it('returns undefined when payload contains invalid base64', async () => {
       const sealed = 'a.b.c.d.e'
       const unsealed = await unseal(key, sealed)
       assertEquals(unsealed, undefined)
     })
 
-    await t.step('empty string', async () => {
+    it('returns undefined when payload is empty', async () => {
       const sealed = ''
       const unsealed = await unseal(key, sealed)
       assertEquals(unsealed, undefined)
     })
   })
 
-  await t.step('should have consistent unseal timing to mitigate timing attacks', async () => {
+  it('maintains consistent unseal timing to mitigate timing attacks', async () => {
     const key = await generateKey(password)
     const sealed = await seal(key, data)
 

@@ -42,15 +42,15 @@ export interface SealOptions {
    * A function to decode a Uint8Array back into the original data format after decryption.
    * @default // A function that parses a UTF-8 string as JSON.
    */
-  decode?: (data: Uint8Array) => unknown | Promise<unknown>
+  decode?: (data: Uint8Array<ArrayBuffer>) => unknown | Promise<unknown>
 }
 
 interface SealedV1 {
   base: string
-  s: Uint8Array
-  iv: Uint8Array
-  w: Uint8Array
-  ct: Uint8Array
+  s: Uint8Array<ArrayBuffer>
+  iv: Uint8Array<ArrayBuffer>
+  w: Uint8Array<ArrayBuffer>
+  ct: Uint8Array<ArrayBuffer>
 }
 
 /**
@@ -118,12 +118,12 @@ export async function seal(
   const iv = crypto.getRandomValues(new Uint8Array(12))
 
   const base = `${header}.${toBase64(s)}.${toBase64(iv)}`
-  const aad = await encode({ base, custom })
+  const aad = (await encode({ base, custom })).slice()
 
   const ct = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv, additionalData: aad, tagLength: 128 },
     dek,
-    await encode(data),
+    (await encode(data)).slice(),
   )
 
   const kek = await crypto.subtle.deriveKey(
@@ -176,7 +176,7 @@ export async function unseal(
     } = parseSealedV1(sealed)
 
     let isValid = ok
-    const aad = await encode({ base: isValid ? base : fakeBase, custom })
+    const aad = (await encode({ base: isValid ? base : fakeBase, custom })).slice()
 
     const kek = await crypto.subtle.deriveKey(
       { name: 'PBKDF2', salt: s, iterations: it, hash: 'SHA-256' },
@@ -273,11 +273,11 @@ export class CryptoManager {
   }
 }
 
-function toBase64(u8: Uint8Array): string {
+function toBase64(u8: Uint8Array<ArrayBuffer>): string {
   return _uint8ArrayToBase64(u8, { urlSafe: true })
 }
 
-function fromBase64(b64: string): Uint8Array | undefined {
+function fromBase64(b64: string): Uint8Array<ArrayBuffer> | undefined {
   try {
     return _base64ToUint8Array(b64)
   } catch {
