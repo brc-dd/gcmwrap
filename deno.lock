@@ -6,7 +6,7 @@
     "npm:@msgpack/msgpack@^3.1.2": "3.1.2",
     "npm:cbor2@^2.0.1": "2.0.1",
     "npm:cborg@^4.2.18": "4.2.18",
-    "npm:cross-bdd@~0.1.2": "0.1.2",
+    "npm:cross-bdd@0.2": "0.2.0",
     "npm:uint8array-extras@^1.5.0": "1.5.0"
   },
   "jsr": {
@@ -37,8 +37,8 @@
       "integrity": "sha512-uzhkd5HOaLccokqeZa5B0Qz7/aa9C12pmUq5yU3vcy6I6OhTKdPHSzOuBPZfcoQHdcx8Emz/dWZbPNNfF/puvg==",
       "bin": true
     },
-    "cross-bdd@0.1.2": {
-      "integrity": "sha512-85pnooB+P6U7G1Ynf3cFoUIULLTqNRzHetBUNVsQNRHTo+GQDifdB2DTh9JSW1NcMtLaNMOIq7t4F97ch//yqg=="
+    "cross-bdd@0.2.0": {
+      "integrity": "sha512-7rcKebgnLVAf/rAExIQeFHGMb0jBWJbqZYN33A1zF2pnP+1kK57uWv2vMj9juAYNgweSSWf9heTjJ1J5L+/MRA=="
     },
     "uint8array-extras@1.5.0": {
       "integrity": "sha512-rvKSBiC5zqCCiDZ9kAOszZcDvdAHwwIKJG33Ykj43OKcWsnmcBRL09YTU4nOeHZ8Y2a7l1MgTd08SBe9A8Qj6A=="
@@ -50,7 +50,7 @@
       "npm:@msgpack/msgpack@^3.1.2",
       "npm:cbor2@^2.0.1",
       "npm:cborg@^4.2.18",
-      "npm:cross-bdd@~0.1.2",
+      "npm:cross-bdd@0.2",
       "npm:uint8array-extras@^1.5.0"
     ]
   }

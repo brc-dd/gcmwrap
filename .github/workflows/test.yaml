@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   test:
-    uses: globalbrain/hado/.github/workflows/test.reusable.yaml@main
+    uses: brc-dd/cross-bdd/.github/workflows/test.reusable.yaml@main
     with:
       deno_versions: stable
       bun_versions: latest
