@@ -18,4 +18,4 @@ jobs:
     with:
       deno_versions: stable
       bun_versions: latest
-      node_versions: 20 22 24
+      node_versions: 20 22 24 latest

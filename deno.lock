@@ -1,17 +1,17 @@
 {
   "version": "5",
   "specifiers": {
-    "jsr:@std/assert@^1.0.15": "1.0.15",
+    "jsr:@std/assert@^1.0.16": "1.0.16",
     "jsr:@std/internal@^1.0.12": "1.0.12",
     "npm:@msgpack/msgpack@^3.1.2": "3.1.2",
     "npm:cbor2@^2.0.1": "2.0.1",
-    "npm:cborg@^4.2.18": "4.2.18",
+    "npm:cborg@^4.3.0": "4.3.0",
     "npm:cross-bdd@0.2": "0.2.0",
     "npm:uint8array-extras@^1.5.0": "1.5.0"
   },
   "jsr": {
-    "@std/assert@1.0.15": {
-      "integrity": "d64018e951dbdfab9777335ecdb000c0b4e3df036984083be219ce5941e4703b",
+    "@std/assert@1.0.16": {
+      "integrity": "6a7272ed1eaa77defe76e5ff63ca705d9c495077e2d5fd0126d2b53fc5bd6532",
       "dependencies": [
         "jsr:@std/internal"
       ]
@@ -33,8 +33,8 @@
         "@cto.af/wtf8"
       ]
     },
-    "cborg@4.2.18": {
-      "integrity": "sha512-uzhkd5HOaLccokqeZa5B0Qz7/aa9C12pmUq5yU3vcy6I6OhTKdPHSzOuBPZfcoQHdcx8Emz/dWZbPNNfF/puvg==",
+    "cborg@4.3.0": {
+      "integrity": "sha512-vOXo1pB4mdeBw3LbpoynQlZNw/H3kZVHLtPYlp8kFMreL/2YfT54F70BM1s3iDoCtQ+3C9QmiRF4rfCSSTlhBw==",
       "bin": true
     },
     "cross-bdd@0.2.0": {
@@ -46,10 +46,10 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@std/assert@^1.0.15",
+      "jsr:@std/assert@^1.0.16",
       "npm:@msgpack/msgpack@^3.1.2",
       "npm:cbor2@^2.0.1",
-      "npm:cborg@^4.2.18",
+      "npm:cborg@^4.3.0",
       "npm:cross-bdd@0.2",
       "npm:uint8array-extras@^1.5.0"
     ]
